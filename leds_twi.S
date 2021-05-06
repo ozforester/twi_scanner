@@ -45,7 +45,7 @@ twi_scan:			;
 	ldi address, 127	; will step backward
 	twscan1:		;
 	rcall twi_start		; start/rep_start
-	rcall twi_slaw		; slawe addres + w
+	rcall twi_slaw		; slave addres + w
 	cpi temp, 0xFF		; touched?
 	brne twscan2		; if not cleared
 	clr temp		; (temp=0x00)
