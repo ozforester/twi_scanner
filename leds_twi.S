@@ -4,7 +4,7 @@
 ; that can be found in the LICENSE file.
 
 ; ATmega8 @4MHz internal osc. (H:D9, L:23)
-; scans twi bus and blinks two nibbles of the first answered device (including W bit)
+; scans twi bus and blinks two nibbles of the first answered device (w/o W bit)
 ; (to be continued as blinking via PCF8574AT extension)
 
 
@@ -38,7 +38,6 @@ main:				;
 	rcall error_blink	; error blink
 	main1:			;
 	rcall code_blink	; blink address nibbles
-	rjmp main1		;
 	ret			;
 
 twi_scan:			;
@@ -47,11 +46,11 @@ twi_scan:			;
 	rcall twi_start		; start/rep_start
 	rcall twi_slaw		; slave addres + w
 	cpi temp, 0xFF		; touched?
-	brne twscan2		; if not cleared
+	breq twscan2		; if not cleared
 	clr temp		; (temp=0x00)
 	subi address, 1		; else next address
 	cpi address, 0		; last address
-	brne twscan2		;
+	breq twscan2		;
 	rjmp twscan1		;
 	twscan2:		;
 	rcall twi_stop		;
@@ -108,8 +107,10 @@ error_blink:			;
         ret                     ;
 
 code_blink:                     ;
+	lsr address		; r/w inclusive if comment
+	again:			;
 	cpi address, 0		; if 0 it blinks constantly so skip
-	breq c3			; it while zero address may appear
+	breq c3			; while zero address may appear
 	mov temp, address	; load high nibble
 	swap temp		;
 	andi temp, 0x0F		;
@@ -129,14 +130,15 @@ code_blink:                     ;
         brne c2                 ;
         ldi counter, 60         ; pause after
         rcall delay             ;
+	rjmp again		;
 	c3:			;
         ret                     ;
 
 led_blink:                      ; blink once
-        sbi PORTB, 0            ; B0 high
+        sbi PORTD, 7            ; D7 high
         ldi counter, 1          ; delay on
         rcall delay             ;
-        cbi PORTB, 0            ; B0 low
+        cbi PORTD, 7            ; D7 low
         ldi counter, 5          ; delay off
         rcall delay             ;
         ret                     ;
@@ -148,8 +150,8 @@ wait:                           ;
         ret                     ; voila
 
 port_init:			;
-	sbi DDRB, 0		; B0 output
-	cbi PORTB, 0		; B0 low
+	sbi DDRD, 7		; D7 output
+	cbi PORTD, 7		; D7 low
 	ret			;
 
 twi_init:			; 100 kHz @4MHz clock
