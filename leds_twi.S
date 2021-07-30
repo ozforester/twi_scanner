@@ -29,14 +29,15 @@ address = 19			; scanned address reg
 
 .global main                    ;
 main:				;
-	rcall port_init		; B0 out,low
+	rcall port_init		; out,low
 	rcall timer_init	; timer0
 	rcall twi_init		; 100kHz
-	rcall twi_scan		; downwards 127..0 (0 = not answered scan)
+	rcall twi_scan		; downwards 127..0 (0 = no answer)
         cpi address, 0          ; there was no answer
         brne main1              ; if not cleared
 	rcall error_blink	; error blink
 	main1:			;
+	; $address$		;
 	rcall code_blink	; blink address nibbles
 	ret			;
 
