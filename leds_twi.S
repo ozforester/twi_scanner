@@ -159,7 +159,8 @@ twi_init:			; 100 kHz @4MHz clock
 	ldi temp, 0b00001100	; 4000000 / ( 16 + 2*TWBR * 4^TWPS )
 	out TWBR, temp		; 12
         in temp, TWSR	        ;
-	ori temp, 0b00000011	; 64
+        ori temp, 0b00000000    ; 1
+	;ori temp, 0b00000011	; 64
 	out TWSR, temp		;
 	ret			;
 
