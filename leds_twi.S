@@ -4,9 +4,8 @@
 ; that can be found in the LICENSE file.
 
 ; ATmega8 @4MHz internal osc. (H:D9, L:23)
-; scans twi bus and blinks two nibbles of the first answered device (w/o W bit)
-; (to be continued as blinking via PCF8574AT extension)
-
+; scans twi bus and blinks two hex nibbles of the first answered node
+; zero as one long blink and [1-9] as short blinks
 
 #include <avr/io.h>
 #include <util/twi.h>
@@ -29,15 +28,14 @@ address = 19			; scanned address reg
 
 .global main                    ;
 main:				;
-	rcall port_init		; out,low
-	rcall timer_init	; timer0
+        rcall port_init         ; out,low
+        rcall timer_init        ; timer0
 	rcall twi_init		; 100kHz
-	rcall twi_scan		; downwards 127..0 (0 = no answer)
+	rcall twi_scan		; 127 down to 0 (0 = no answer)
         cpi address, 0          ; there was no answer
         brne main1              ; if not cleared
-	rcall error_blink	; error blink
+	rcall error		; error blink
 	main1:			;
-	; $address$		;
 	rcall code_blink	; blink address nibbles
 	ret			;
 
@@ -46,19 +44,21 @@ twi_scan:			;
 	twscan1:		;
 	rcall twi_start		; start/rep_start
 	rcall twi_slaw		; slave addres + w
-	cpi temp, 0xFF		; touched?
-	breq twscan2		; if not cleared
+	cpi temp, 0xFF		; slaw not acked (temp == 0xFF)
+	brne twscan2		; acked (temp == 0x00)
 	clr temp		; (temp=0x00)
 	subi address, 1		; else next address
 	cpi address, 0		; last address
 	breq twscan2		;
+	;ldi counter, 2
+	;rcall delay
 	rjmp twscan1		;
 	twscan2:		;
 	rcall twi_stop		;
 	ret			;
 
 twi_slaw:					;
-	ldi temp, address			; 0x3F slave address
+	mov temp, address			; 0x3F slave address
 	lsl temp				; 0x7E << (0x3F slave address + 0), R/W = W
 	out TWDR, temp				;
 	ldi temp, (1<<TWINT)|(1<<TWEN)		;
@@ -76,7 +76,7 @@ twi_slaw:					;
 	ret					;
 
 twi_start:						;
-	ldi temp, ((1<<TWINT)|(1<<TWSTA)|(1<<TWEN))	;
+	ldi temp, (1<<TWINT)|(1<<TWSTA)|(1<<TWEN)	;
 	out TWCR, temp					; go
 	start1:						;
 	in temp, TWCR					;
@@ -88,64 +88,77 @@ twi_start:						;
 	breq start2					;
         cpi temp, REP_START                             ;
         breq start2                                     ;
-	rcall error_blink				; error (blinking loop)
+	rcall error					; error (blinking loop)
 	start2:						;
 	ret						; acked
 
 twi_stop:						;
-	ldi r16, (1<<TWINT)|(1<<TWEN)|(1<<TWSTO)	;        out TWCR, temp                                  ;
+	ldi r16, (1<<TWINT)|(1<<TWEN)|(1<<TWSTO)	;
+        out TWCR, temp                                  ;
 	ret						;
 
-error_blink:			;
-        eb:                     ;
-        sbi PORTB, 0            ; B0 high
+error:				;
+        sbi PORTD, 7            ; B0 high
         ldi counter, 1          ; delay on
         rcall delay             ;
-        cbi PORTB, 0            ; B0 low
-        ldi counter, 5          ; delay off
+        cbi PORTD, 7            ; B0 low
+        ldi counter, 1          ; delay off
         rcall delay             ;
-        rjmp eb                 ;
+        rjmp error              ;
         ret                     ;
 
 code_blink:                     ;
-	lsr address		; r/w inclusive if comment
 	again:			;
-	cpi address, 0		; if 0 it blinks constantly so skip
-	breq c3			; while zero address may appear
 	mov temp, address	; load high nibble
 	swap temp		;
 	andi temp, 0x0F		;
 	mov code, temp		;
-	c1:			;
-        rcall led_blink         ;
-	subi code, 1		;
-	brne c1			;
-        ldi counter, 30         ; pause between
-        rcall delay             ;
+        rcall blink_nibble      ;
+	ldi counter, 10		; delay between nibbles
+	rcall delay		;
         mov temp, address       ; load low nibble
         andi temp, 0x0F         ;
         mov code, temp          ;
-	c2:                     ;
+        rcall blink_nibble      ;
+	ldi counter, 30		; delay before repeat
+	rcall delay		;
+	rjmp again		;
+        ret                     ;
+
+blink_nibble:			;
+	cpi code, 0		;
+	brne c1			;
+	rcall long_blink	;
+	rjmp c2			;
+	c1:
+	cpi code, 0
+	breq c2
         rcall led_blink         ;
         subi code, 1            ;
-        brne c2                 ;
-        ldi counter, 50         ; pause after
-        rcall delay             ;
-	rjmp again		;
-	c3:			;
-        ret                     ;
+	rjmp c1			;
+	c2:			;
+	ret			;
 
 led_blink:                      ; blink once
         sbi PORTD, 7            ; D7 high
         ldi counter, 3          ; delay on
         rcall delay             ;
         cbi PORTD, 7            ; D7 low
-        ldi counter, 6          ; delay off
+        ldi counter, 3          ; delay off
+        rcall delay             ;
+        ret                     ;
+
+long_blink:                      ; blink once
+        sbi PORTD, 7            ; D7 high
+        ldi counter, 12	        ; delay on
+        rcall delay             ;
+        cbi PORTD, 7            ; D7 low
+        ldi counter, 3          ; delay off
         rcall delay             ;
         ret                     ;
 
 delay:                          ; counter itself decrements by t0 isr
-wait:                           ;
+	wait:                   ;
         cpi counter, 0          ; just wait 0
         brne wait               ;
         ret                     ; voila
@@ -175,11 +188,13 @@ timer_init:			; TIMER0 (65 ms @4MHz)
 
 .global TIMER0_OVF_vect		; doc
 TIMER0_OVF_vect:		; counter--
-	push temp		;
+        push temp               ;
 	in temp, SREG		; z in main loop
+        push temp               ;
 	subi counter, 1		;
+        pop temp                ;
 	out SREG, temp		;
-	pop temp		;
+        pop temp                ;
 	reti			;
 
 .global __vector_default        ; Note [10] nongnu.org assembly
