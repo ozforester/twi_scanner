@@ -120,7 +120,7 @@ code_blink:                     ;
         rcall led_blink         ;
 	subi code, 1		;
 	brne c1			;
-        ldi counter, 15         ; pause between
+        ldi counter, 30         ; pause between
         rcall delay             ;
         mov temp, address       ; load low nibble
         andi temp, 0x0F         ;
@@ -129,7 +129,7 @@ code_blink:                     ;
         rcall led_blink         ;
         subi code, 1            ;
         brne c2                 ;
-        ldi counter, 60         ; pause after
+        ldi counter, 50         ; pause after
         rcall delay             ;
 	rjmp again		;
 	c3:			;
@@ -137,10 +137,10 @@ code_blink:                     ;
 
 led_blink:                      ; blink once
         sbi PORTD, 7            ; D7 high
-        ldi counter, 1          ; delay on
+        ldi counter, 3          ; delay on
         rcall delay             ;
         cbi PORTD, 7            ; D7 low
-        ldi counter, 5          ; delay off
+        ldi counter, 6          ; delay off
         rcall delay             ;
         ret                     ;
 

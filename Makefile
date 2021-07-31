@@ -17,7 +17,7 @@ all:
 	avr-size ${TARGET}.hex
 
 flash:
-	avrdude -c usbasp -p m8 -B 2 -U flash:w:${TARGET}.hex
+	avrdude -c usbasp -p m8 -B 3 -U flash:w:${TARGET}.hex
 
 clean:
 	rm -f $(OBJECTS) $(TARGET).o $(TARGET).elf $(TARGET).hex
